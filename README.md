@@ -6,6 +6,7 @@
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/4602f447d1c1408d865ebb4ef68f12f1)](https://app.codacy.com/gh/mpromonet/v4l2rtspserver/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 [![Coverity Scan Build Status](https://scan.coverity.com/projects/4644/badge.svg)](https://scan.coverity.com/projects/4644)
 [![Coverage Status](https://coveralls.io/repos/github/mpromonet/v4l2rtspserver/badge.svg?branch=master)](https://coveralls.io/github/mpromonet/v4l2rtspserver?branch=master)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/8853/badge)](https://www.bestpractices.dev/projects/8853)
 
 [![Release](https://img.shields.io/github/release/mpromonet/v4l2rtspserver.svg)](https://github.com/mpromonet/v4l2rtspserver/releases/latest)
 [![Download](https://img.shields.io/github/downloads/mpromonet/v4l2rtspserver/total.svg)](https://github.com/mpromonet/v4l2rtspserver/releases/latest)
@@ -123,9 +124,6 @@ This RTSP server works with Raspberry Pi camera using :
 
 	sudo modprobe -v bcm2835-v4l2
 	
-- the closed source V4L2 driver for the Raspberry Pi Camera Module http://www.linux-projects.org/uv4l/
-
-	sudo uv4l --driver raspicam --auto-video_nr --encoding h264
 
 Using v4l2loopback
 ----------------------- 
@@ -157,7 +155,7 @@ It is now possible to play HLS url directly from browser :
  * using Firefox installing [Native HLS addons](https://addons.mozilla.org/en-US/firefox/addon/native_hls_playback)
  * using Chrome installing [Native HLS playback](https://chrome.google.com/webstore/detail/native-hls-playback/emnphkkblegpebimobpbekeedfgemhof)
 
-There is also a small HTML page that use hls.js and dash.js, but dash still not work because player doesnot support MP2T format.
+There is also a small HTML page that use hls.js.
 
 Using Docker image
 ===============
