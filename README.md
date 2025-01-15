@@ -38,6 +38,8 @@ Dependencies
 If liblog4cpp5-dev is not present, a simple log using std::cout is used.
  - libasound2-dev Licence LGPL (optional)
 If libasound2-dev is not present in the build environment, there will have no audio support.
+ - libssl-dev (optional)
+If libssl-dev is not present rtsps/srtp will not be available
 
 Usage
 -----
@@ -61,7 +63,8 @@ Usage
 		 -c       : don't repeat config (default repeat config before IDR frame)
 		 -t secs  : RTCP expiration timeout (default 65)
 		 -S[secs] : HTTP segment duration (enable HLS & MPEG-DASH)
-		 -x <sslkeycert>  : enable RTSPS & SRTP
+		 -x <sslkeycert>  : enable SRTP
+		 -X               : enable RSTPS
  
 		 V4L2 options :
 		 -r       : V4L2 capture using read interface (default use memory mapped buffers)

@@ -13,7 +13,12 @@
 
 #pragma once
 
+#include <list>
+
+// hacking private members RTSPServer::fWeServeSRTP & RTSPServer::fWeEncryptSRTP
+#define private protected
 #include "RTSPServer.hh"
+#undef private
 #include "RTSPCommon.hh"
 #include <GroupsockHelper.hh> // for "ignoreSigPipeOnSocket()"
 
@@ -161,8 +166,49 @@ class HTTPServer : public RTSPServer
 			virtual void handleCmd_SETUP(RTSPServer::RTSPClientConnection* ourClientConnection, char const* urlPreSuffix, char const* urlSuffix, char const* fullRequestStr);
 	};
 
+
+	class MyUserAuthenticationDatabase : public UserAuthenticationDatabase {
+		public:
+			MyUserAuthenticationDatabase(char const* realm = NULL, Boolean passwordsAreMD5 = False) : UserAuthenticationDatabase(realm, passwordsAreMD5) {}
+			virtual ~MyUserAuthenticationDatabase() {}
+
+			std::list<std::string> getUsers() {
+				std::list<std::string> users;
+				HashTable::Iterator *iter(HashTable::Iterator::create(*fTable));
+				char const* key;
+				char* user;
+				while ((user = (char*)iter->next(key)) != NULL) {
+					users.push_back(user);
+				}
+				return users;
+			}
+
+	    static MyUserAuthenticationDatabase* createNew(const std::list<std::string> & userPasswordList, const char* realm)
+	    {
+            MyUserAuthenticationDatabase* auth = NULL;
+            if (userPasswordList.size() > 0)
+            {
+                auth = new MyUserAuthenticationDatabase(realm, (realm != NULL) );
+                
+                std::list<std::string>::const_iterator it;
+                for (it = userPasswordList.begin(); it != userPasswordList.end(); ++it)
+                {
+                    std::istringstream is(*it);
+                    std::string user;
+                    getline(is, user, ':');	
+                    std::string password;
+                    getline(is, password);	
+                    auth->addUserRecord(user.c_str(), password.c_str());
+                }
+            }
+            
+            return auth;
+        }
+
+	};
+
 	public:
-		static HTTPServer* createNew(UsageEnvironment& env, Port rtspPort, UserAuthenticationDatabase* authDatabase, unsigned reclamationTestSeconds, unsigned int hlsSegment, const std::string webroot, const char* sslCert) 
+		static HTTPServer* createNew(UsageEnvironment& env, Port rtspPort, const std::list<std::string> & userPasswordList, const char* realm, unsigned reclamationTestSeconds, unsigned int hlsSegment, const std::string & webroot, const std::string & sslCert, bool enableRTSPS) 
 		{
 			HTTPServer* httpServer = NULL;
 #if LIVEMEDIA_LIBRARY_VERSION_INT < 1610928000
@@ -178,43 +224,104 @@ class HTTPServer : public RTSPServer
 
 			if (ourSocketIPv4 != -1) 
 			{
-				httpServer = new HTTPServer(env, ourSocketIPv4, ourSocketIPv6, rtspPort, authDatabase, reclamationTestSeconds, hlsSegment, webroot, sslCert);
+				MyUserAuthenticationDatabase* authDatabase = MyUserAuthenticationDatabase::createNew(userPasswordList, realm);
+				httpServer = new HTTPServer(env, ourSocketIPv4, ourSocketIPv6, rtspPort, authDatabase, reclamationTestSeconds, hlsSegment, webroot, sslCert, enableRTSPS);
 			}
 			return httpServer;
 		}
 
 #if LIVEMEDIA_LIBRARY_VERSION_INT	<	1611187200
-		HTTPServer(UsageEnvironment& env, int ourSocketIPv4, int ourSocketIPv6, Port rtspPort, UserAuthenticationDatabase* authDatabase, unsigned reclamationTestSeconds, unsigned int hlsSegment, const std::string & webroot, const char* sslCert)
-		  : RTSPServer(env, ourSocketIPv4, rtspPort, authDatabase, reclamationTestSeconds), m_hlsSegment(hlsSegment), m_webroot(webroot), m_sslCert(sslCert)
+		HTTPServer(UsageEnvironment& env, int ourSocketIPv4, int ourSocketIPv6, Port rtspPort, MyUserAuthenticationDatabase* authDatabase, unsigned reclamationTestSeconds, unsigned int hlsSegment, const std::string & webroot, const std::string & sslCert, bool enableRTSPS)
+		  : RTSPServer(env, ourSocketIPv4, rtspPort, authDatabase, reclamationTestSeconds), m_hlsSegment(hlsSegment), m_webroot(webroot)
 #else
-		HTTPServer(UsageEnvironment& env, int ourSocketIPv4, int ourSocketIPv6, Port rtspPort, UserAuthenticationDatabase* authDatabase, unsigned reclamationTestSeconds, unsigned int hlsSegment, const std::string & webroot, const char* sslCert)
-		  : RTSPServer(env, ourSocketIPv4, ourSocketIPv6, rtspPort, authDatabase, reclamationTestSeconds), m_hlsSegment(hlsSegment), m_webroot(webroot), m_sslCert(sslCert)
+		HTTPServer(UsageEnvironment& env, int ourSocketIPv4, int ourSocketIPv6, Port rtspPort, MyUserAuthenticationDatabase* authDatabase, unsigned reclamationTestSeconds, unsigned int hlsSegment, const std::string & webroot, const std::string & sslCert, bool enableRTSPS)
+		  : RTSPServer(env, ourSocketIPv4, ourSocketIPv6, rtspPort, authDatabase, reclamationTestSeconds), m_hlsSegment(hlsSegment), m_webroot(webroot)
 #endif			
 		{
-                       if ( (!m_webroot.empty()) && (*m_webroot.rend() != '/') ) {
-                               m_webroot += "/";
-                       }
-#if LIVEMEDIA_LIBRARY_VERSION_INT >= 1642723200      
-                if (this->isSSL()) {
-                    this->setTLSState(m_sslCert, m_sslCert, true, true);
-                }
-#endif   			
+				if ( (!m_webroot.empty()) && (*m_webroot.rend() != '/') ) {
+						m_webroot += "/";
+				}
+				this->setTLS(sslCert, enableRTSPS);
 		}
 
 		virtual RTSPServer::ClientConnection* createNewClientConnection(int clientSocket, struct SOCKETCLIENT clientAddr) 
 		{
-			return new HTTPClientConnection(*this, clientSocket, clientAddr, this->isSSL());
+			return new HTTPClientConnection(*this, clientSocket, clientAddr, isRTSPS());
 		}
 		
 		virtual RTSPServer::ClientSession* createNewClientSession(u_int32_t sessionId) {
 			return new HTTPClientSession(*this, sessionId);
 		}
 
-		bool isSSL() { return (m_sslCert != NULL); }
+		void setTLS(const std::string & sslCert, bool enableRTSPS = false, bool encryptSRTP = true) {
+#if LIVEMEDIA_LIBRARY_VERSION_INT >= 1642723200      
+                if (!sslCert.empty()) {
+					this->setTLSFileNames(sslCert.c_str(), sslCert.c_str());
+					fWeServeSRTP = true;
+					fWeEncryptSRTP = encryptSRTP;
+					if (enableRTSPS) {
+						fOurConnectionsUseTLS = true;
+					} else {
+						fOurConnectionsUseTLS = false;
+					}
+                } else {
+					fOurConnectionsUseTLS = false;
+					fWeServeSRTP = false;
+					fWeEncryptSRTP = false;
+				}
+#endif  			
+		}
 
-        private:
+		bool isRTSPS() { 
+#if LIVEMEDIA_LIBRARY_VERSION_INT >= 1642723200
+			return fOurConnectionsUseTLS; 
+#else
+			return false;
+#endif			
+		}
+
+		bool isSRTP() { 
+#if LIVEMEDIA_LIBRARY_VERSION_INT >= 1642723200
+			return fWeServeSRTP; 
+#else
+			return false;
+#endif			
+		}
+
+		bool isSRTPEncrypted() {
+#if LIVEMEDIA_LIBRARY_VERSION_INT >= 1642723200
+			return fWeEncryptSRTP; 
+#else
+			return false;
+#endif			
+		}
+
+        void addUserRecord(const char* username, const char* password) {
+            UserAuthenticationDatabase* auth = this->getAuthenticationDatabaseForCommand(NULL);
+			if (auth != NULL) {
+	            auth->addUserRecord(username, password);
+			}
+        }
+
+		void removeUserRecord(const char* username) {
+            UserAuthenticationDatabase* auth = this->getAuthenticationDatabaseForCommand(NULL);
+			if (auth != NULL) {
+	            auth->removeUserRecord(username);
+			}
+		}
+
+		std::list<std::string> getUsers() {
+			std::list<std::string> users;
+			MyUserAuthenticationDatabase* auth = (MyUserAuthenticationDatabase*)this->getAuthenticationDatabaseForCommand(NULL);
+			if (auth != NULL) {
+				users = auth->getUsers();
+			}
+			return users;
+		}
+
+
+    private:
 			const unsigned int m_hlsSegment;
 			std::string  m_webroot;
-			const char*  m_sslCert;
 };
 

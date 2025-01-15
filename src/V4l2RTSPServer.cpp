@@ -16,8 +16,8 @@
 #include "logger.h"
 #include "V4l2Capture.h"
 #include "V4l2Output.h"
-#include "DeviceSourceFactory.h"
 #include "V4l2RTSPServer.h"
+#include "DeviceSourceFactory.h"
 #include "VideoCaptureAccess.h"
 
 #ifdef HAVE_ALSA
@@ -43,7 +43,7 @@ StreamReplicator* V4l2RTSPServer::CreateVideoReplicator(
 			
 			if (!outputFile.empty())
 			{
-				V4L2DeviceParameters outparam(outputFile.c_str(), videoCapture->getFormat(), videoCapture->getWidth(), videoCapture->getHeight(), 0, ioTypeOut, inParam.m_verbose);
+				V4L2DeviceParameters outparam(outputFile.c_str(), videoCapture->getFormat(), videoCapture->getWidth(), videoCapture->getHeight(), 0, ioTypeOut);
 				out = V4l2Output::create(outparam);
 				if (out != NULL)
 				{
@@ -209,7 +209,7 @@ StreamReplicator* V4l2RTSPServer::CreateAudioReplicator(
 		// Init audio capture
 		LOG(NOTICE) << "Create ALSA Source..." << audioDevice;
 		
-		ALSACaptureParameters param(audioDevice.c_str(), audioFmtList, audioFreq, audioNbChannels, verbose);
+		ALSACaptureParameters param(audioDevice.c_str(), audioFmtList, audioFreq, audioNbChannels);
 		ALSACapture* audioCapture = ALSACapture::createNew(param);
 		if (audioCapture) 
 		{

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.5)
 
 project(v4l2rtspserver)
 
@@ -43,22 +43,6 @@ message(STATUS "CMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}")
 message(STATUS "CMAKE_C_COMPILER=${CMAKE_C_COMPILER}")
 message(STATUS "CMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}")
 
-#pthread
-find_package (Threads)
-target_link_libraries (${PROJECT_NAME} Threads::Threads) 
-
-
-# LOG4CPP
-if (LOG4CPP) 
-    find_library(LOG4CPP_LIBRARY NAMES log4cpp)
-    if (LOG4CPP_LIBRARY)
-        message(STATUS "Log4Cpp available ${LOG4CPP_LIBRARY}")
-        add_definitions(-DHAVE_LOG4CPP)
-        target_link_libraries(${PROJECT_NAME} "${LOG4CPP_LIBRARY}")
-        
-        SET(CPACK_DEBIAN_PACKAGE_DEPENDS ${CPACK_DEBIAN_PACKAGE_DEPENDS}liblog4cpp5v5,)
-    endif ()
-endif ()
 
 # openssl ?
 if (WITH_SSL)
@@ -67,14 +51,13 @@ endif()
 MESSAGE("OpenSSL_FOUND = ${OpenSSL_FOUND}")
 
 # live555
-find_package(libliveMedia)
-find_package(libUsageEnvironment)
-find_package(libBasicUsageEnvironment)
-find_package(libgroupsock)
-if (LIBLIVEMEDIA_FOUND AND LIBBASICUSAGEENVIRONMENT_FOUND AND LIBUSAGEENVIRONMENT_FOUND AND LIBGROUPSOCK_FOUND)
-    message(STATUS "live555 loaded")
-    set(LIVEINCLUDE ${LIBLIVEMEDIA_INCLUDE_DIR} ${LIBBASICUSAGEENVIRONMENT_INCLUDE_DIR} ${LIBUSAGEENVIRONMENT_INCLUDE_DIR} ${LIBGROUPSOCK_INCLUDE_DIR})
-    SET(LIVE_LIBRARIES ${LIBLIVEMEDIA_LIBRARY} ${LIBUSAGEENVIRONMENT_LIBRARY} ${LIBBASICUSAGEENVIRONMENT_LIBRARY} ${LIBGROUPSOCK_LIBRARY}) 
+find_package(PkgConfig)
+pkg_check_modules(live555 QUIET live555)
+MESSAGE("live555_FOUND = ${live555_FOUND}")
+if (live555_FOUND)
+    message(STATUS "live555 found")
+    set(LIVEINCLUDE ${live555_INCLUDE_DIRS})
+    SET(LIVE_LIBRARIES ${live555_LIBRARIES}) 
     SET(CPACK_DEBIAN_PACKAGE_DEPENDS ${CPACK_DEBIAN_PACKAGE_DEPENDS}livemedia-utils,)
 else()
     set(LIVE ${CMAKE_BINARY_DIR}/live)
@@ -86,16 +69,11 @@ else()
         if(NOT unpack_result STREQUAL "0")
             message(FATAL_ERROR "Fetching and compiling live555 failed!")
         endif()
-        message(STATUS "patch live555")
-        EXECUTE_PROCESS(COMMAND patch -d ${CMAKE_BINARY_DIR} -f -p 1 -i ${PROJECT_SOURCE_DIR}/patches/001_live555_sprintf_format RESULT_VARIABLE patch_result)
-        if(NOT patch_result STREQUAL "0")
-            message(FATAL_ERROR "Patching live555 failed! error:${patch_result}")
-        endif()        
     endif()
     FILE(GLOB LIVESOURCE ${LIVE}/groupsock/*.c* ${LIVE}/liveMedia/*.c* ${LIVE}/UsageEnvironment/*.c* ${LIVE}/BasicUsageEnvironment/*.c*)
-    if (NOT OpenSSL_FOUND)
-        set(LIVE555CFLAGS ${LIVE555CFLAGS} -DNO_OPENSSL=1)
-    endif()
+endif()
+if (NOT OpenSSL_FOUND)
+    set(LIVE555CFLAGS ${LIVE555CFLAGS} -DNO_OPENSSL=1)
 endif()
 
 # librtsp
@@ -107,6 +85,22 @@ target_link_libraries (${PROJECT_NAME} libv4l2rtspserver ${LIVE_LIBRARIES})
 set (LIBRARIES "")
 if (OpenSSL_FOUND)
     set(LIBRARIES ${LIBRARIES} ${OPENSSL_LIBRARIES})
+endif ()
+
+#pthread
+find_package (Threads)
+target_link_libraries (libv4l2rtspserver PUBLIC Threads::Threads) 
+
+# LOG4CPP
+if (LOG4CPP) 
+    find_library(LOG4CPP_LIBRARY NAMES log4cpp)
+    if (LOG4CPP_LIBRARY)
+        message(STATUS "Log4Cpp available ${LOG4CPP_LIBRARY}")
+        target_compile_definitions(libv4l2rtspserver PUBLIC HAVE_LOG4CPP)
+        target_link_libraries(libv4l2rtspserver PUBLIC "${LOG4CPP_LIBRARY}")
+        
+        SET(CPACK_DEBIAN_PACKAGE_DEPENDS ${CPACK_DEBIAN_PACKAGE_DEPENDS}liblog4cpp5v5,)
+    endif ()
 endif ()
 
 #ALSA
@@ -122,7 +116,7 @@ if (ALSA)
 endif()
 
 # libv4l2cpp
-EXEC_PROGRAM("git submodule update --init")
+execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init)
 add_subdirectory(libv4l2cpp EXCLUDE_FROM_ALL)
 target_include_directories(libv4l2rtspserver PUBLIC libv4l2cpp/inc)
 target_link_libraries (libv4l2rtspserver PUBLIC libv4l2cpp ${LIBRARIES}) 
