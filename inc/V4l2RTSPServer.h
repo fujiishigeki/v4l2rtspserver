@@ -17,28 +17,26 @@
 #include <BasicUsageEnvironment.hh>
 #include <GroupsockHelper.hh>
 
+#include "HTTPServer.h"
 #include "UnicastServerMediaSubsession.h"
 #include "MulticastServerMediaSubsession.h"
 #include "TSServerMediaSubsession.h"
-#include "HTTPServer.h"
 
 class V4l2RTSPServer {
     public:
-        V4l2RTSPServer(unsigned short rtspPort, unsigned short rtspOverHTTPPort = 0, int timeout = 10, unsigned int hlsSegment = 0, const std::list<std::string> & userPasswordList = std::list<std::string>(), const char* realm = NULL, const std::string & webroot = "", const char *sslkeycert = NULL)
+        V4l2RTSPServer(unsigned short rtspPort, unsigned short rtspOverHTTPPort = 0, int timeout = 10, unsigned int hlsSegment = 0, const std::list<std::string> & userPasswordList = std::list<std::string>(), const char* realm = NULL, const std::string & webroot = "", const std::string & sslkeycert = "", bool enableRTSPS = false)
             : m_stop(0)
             , m_env(BasicUsageEnvironment::createNew(*BasicTaskScheduler::createNew()))
             , m_rtspPort(rtspPort)
         {     
-            UserAuthenticationDatabase* auth = createUserAuthenticationDatabase(userPasswordList, realm);
-            m_rtspServer = HTTPServer::createNew(*m_env, rtspPort, auth, timeout, hlsSegment, webroot, sslkeycert);
+            m_rtspServer = HTTPServer::createNew(*m_env, rtspPort, userPasswordList, realm, timeout, hlsSegment, webroot, sslkeycert, enableRTSPS);
            	if (m_rtspServer != NULL)
             {
                 if (rtspOverHTTPPort)
                 {
                     m_rtspServer->setUpTunnelingOverHTTP(rtspOverHTTPPort);
                 }             
-            }
-            
+            }            
         }
 
         virtual ~V4l2RTSPServer() {
@@ -164,7 +162,7 @@ class V4l2RTSPServer {
             return this->addSession(url, subSession);
         }	
 
-        void decodeMulticastUrl(const std::string & maddr, in_addr & destinationAddress, unsigned short & rtpPortNum, unsigned short & rtcpPortNum)
+        std::string decodeMulticastUrl(const std::string & maddr, in_addr & destinationAddress, unsigned short & rtpPortNum, unsigned short & rtcpPortNum)
         {
             std::istringstream is(maddr);
             std::string ip;
@@ -189,14 +187,14 @@ class V4l2RTSPServer {
             {
                 rtcpPortNum = atoi(port.c_str());
             }
+            return inet_ntoa(destinationAddress) + std::string(":") + std::to_string(rtpPortNum) + std::string(":") + std::to_string(rtcpPortNum);
         }
 
-        ServerMediaSession* AddMulticastSession(const std::string& url, std::string& multicasturi, StreamReplicator* videoReplicator, StreamReplicator* audioReplicator) {
+        ServerMediaSession* AddMulticastSession(const std::string& url, const std::string& inmulticasturi, std::string& outmulticasturi, StreamReplicator* videoReplicator, StreamReplicator* audioReplicator) {
 			struct in_addr destinationAddress;
 			unsigned short rtpPortNum;
 			unsigned short rtcpPortNum;
-            this->decodeMulticastUrl(multicasturi, destinationAddress, rtpPortNum, rtcpPortNum);
-            multicasturi = inet_ntoa(destinationAddress) + std::string(":") + std::to_string(rtpPortNum) + std::string(":") + std::to_string(rtcpPortNum);
+            outmulticasturi = this->decodeMulticastUrl(inmulticasturi, destinationAddress, rtpPortNum, rtcpPortNum);
             return this->AddMulticastSession(url, destinationAddress, rtpPortNum, rtcpPortNum, videoReplicator, audioReplicator);
         }
 
@@ -221,29 +219,31 @@ class V4l2RTSPServer {
             m_rtspServer->deleteServerMediaSession(sms);
         }
 
-    protected:
-        UserAuthenticationDatabase* createUserAuthenticationDatabase(const std::list<std::string> & userPasswordList, const char* realm)
-        {
-            UserAuthenticationDatabase* auth = NULL;
-            if (userPasswordList.size() > 0)
-            {
-                auth = new UserAuthenticationDatabase(realm, (realm != NULL) );
-                
-                std::list<std::string>::const_iterator it;
-                for (it = userPasswordList.begin(); it != userPasswordList.end(); ++it)
-                {
-                    std::istringstream is(*it);
-                    std::string user;
-                    getline(is, user, ':');	
-                    std::string password;
-                    getline(is, password);	
-                    auth->addUserRecord(user.c_str(), password.c_str());
-                }
-            }
-            
-            return auth;
+        void addUserRecord(const char* username, const char* password) {
+            m_rtspServer->addUserRecord(username, password);
         }
 
+        std::list<std::string> getUsers() {
+            return m_rtspServer->getUsers();
+        }
+
+        void setTLS(const std::string & sslCert, bool enableRTSPS = false, bool encryptSRTP = true) {
+            m_rtspServer->setTLS(sslCert, enableRTSPS, encryptSRTP);
+        }
+
+        bool isRTSPS() { 
+            return m_rtspServer->isRTSPS(); 
+        }
+
+		bool isSRTP() { 
+            return m_rtspServer->isSRTP(); 
+        }
+
+		bool isSRTPEncrypted() { 
+            return m_rtspServer->isSRTPEncrypted(); 
+        }
+
+    protected:
         ServerMediaSession* addSession(const std::string & sessionName, ServerMediaSubsession* subSession)
         {
             std::list<ServerMediaSubsession*> subSessionList;
@@ -283,6 +283,6 @@ class V4l2RTSPServer {
     protected:
         char              m_stop;
         UsageEnvironment* m_env;	
-        RTSPServer*       m_rtspServer;
+        HTTPServer*       m_rtspServer;
         int               m_rtspPort;
 };

@@ -34,7 +34,7 @@ jobs:
           command: wget -qO- ${CROSSCOMPILER} | tar xz -C /opt 
           no_output_timeout: 30m
       - run: echo "export PATH=$(ls -d /opt/cross-pi-gcc-*/bin):\$PATH" >> $BASH_ENV
-      - run: cmake -DCMAKE_SYSTEM_PROCESSOR=armv6l -DCMAKE_TOOLCHAIN_FILE=${CIRCLE_WORKING_DIRECTORY}/raspberry.toolchain . && make
+      - run: cmake -DCMAKE_SYSTEM_PROCESSOR=armv6l -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=armhf -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_C_COMPILER=arm-linux-gnueabihf-gcc -DCMAKE_CXX_COMPILER=arm-linux-gnueabihf-g++ -DCMAKE_LIBRARY_ARCHITECTURE=arm-linux-gnuebihf -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY . && make
       - run: cpack .
       - run: mkdir -p /distrib && cp *.deb /distrib 
       - persist_to_workspace:
@@ -56,7 +56,7 @@ jobs:
           command: wget -qO- ${CROSSCOMPILER} | tar xz -C /opt 
           no_output_timeout: 30m
       - run: echo "export PATH=$(ls -d /opt/cross-pi-gcc-*/bin):\$PATH" >> $BASH_ENV
-      - run: cmake -DCMAKE_SYSTEM_PROCESSOR=armv7 -DCMAKE_TOOLCHAIN_FILE=${CIRCLE_WORKING_DIRECTORY}/raspberry.toolchain . && make
+      - run: cmake -DCMAKE_SYSTEM_PROCESSOR=armv7 -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=armhf -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_C_COMPILER=arm-linux-gnueabihf-gcc -DCMAKE_CXX_COMPILER=arm-linux-gnueabihf-g++ -DCMAKE_LIBRARY_ARCHITECTURE=arm-linux-gnuebihf -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY . && make
       - run: cpack .
       - run: mkdir -p /distrib && cp *.deb /distrib 
       - persist_to_workspace:
@@ -70,7 +70,7 @@ jobs:
     steps:
       - checkout
       - run: apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cmake autoconf automake libtool git make g++-mips-linux-gnu pkg-config; apt remove -y libssl-dev
-      - run: cmake -DCMAKE_TOOLCHAIN_FILE=${CIRCLE_WORKING_DIRECTORY}/mips.toolchain . && make
+      - run: cmake -DCMAKE_SYSTEM_PROCESSOR=mips -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=mips -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_C_COMPILER=mips-linux-gnu-gcc -DCMAKE_CXX_COMPILER=mips-linux-gnu-g++ -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY . && make
       - run: cpack .
       - run: mkdir -p /distrib && cp *.deb /distrib 
       - persist_to_workspace:
@@ -120,8 +120,7 @@ jobs:
     <<: *defaults
 
     steps:
-      - setup_remote_docker:
-          version: 20.10.12
+      - setup_remote_docker
       - checkout
       - run: git submodule update --init
       - run:
@@ -138,15 +137,15 @@ jobs:
     <<: *defaults
 
     steps:
-      - setup_remote_docker:
-          version: 20.10.12
+      - setup_remote_docker
       - checkout
       - run: git submodule update --init
       - run:
           command: |
             export TAG=${CIRCLE_TAG:-latest}
             docker login --username=$DOCKERHUB_USER --password=$DOCKERHUB_PASS
-            docker build --pull -t $CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME:${TAG}-arm32v7 -f Dockerfile.rpi .
+            docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+            docker build --pull -t $CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME:${TAG}-arm32v7 --build-arg IMAGE=balenalib/raspberry-pi2 .
             docker push $CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME:${TAG}-arm32v7
 
   # -------------------------------------
@@ -156,15 +155,15 @@ jobs:
     <<: *defaults
 
     steps:
-      - setup_remote_docker:
-          version: 20.10.12
+      - setup_remote_docker
       - checkout  
       - run: git submodule update --init
       - run:
           command: |
             export TAG=${CIRCLE_TAG:-latest}
             docker login --username=$DOCKERHUB_USER --password=$DOCKERHUB_PASS
-            docker build --build-arg ARCH=armv6l --pull -t $CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME:${TAG}-arm32v6 -f Dockerfile.rpi . 
+            docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+            docker build --build-arg ARCH=armv6l --pull -t $CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME:${TAG}-arm32v6 --build-arg IMAGE=balenalib/raspberry-pi . 
             docker push $CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME:${TAG}-arm32v6
 
   # -------------------------------------
@@ -174,8 +173,7 @@ jobs:
     <<: *defaults
 
     steps:
-      - setup_remote_docker:
-          version: 20.10.12
+      - setup_remote_docker
       - checkout  
       - run: git submodule update --init
       - run:
@@ -183,7 +181,7 @@ jobs:
             export TAG=${CIRCLE_TAG:-latest}
             docker login --username=$DOCKERHUB_USER --password=$DOCKERHUB_PASS
             docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-            docker build --pull -t $CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME:${TAG}-arm64 -f Dockerfile.arm64 . 
+            docker build --pull -t $CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME:${TAG}-arm64 --platform linux/arm64 --build-arg IMAGE=ubuntu:24.04 . 
             docker push $CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME:${TAG}-arm64
 
   # -------------------------------------
@@ -193,8 +191,7 @@ jobs:
     <<: *defaults
 
     steps:
-      - setup_remote_docker:
-          version: 20.10.12
+      - setup_remote_docker
       - run:
           command: |
             mkdir $HOME/.docker
