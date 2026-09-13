@@ -34,11 +34,13 @@
       - libssl-dev
       - zlib1g-dev
       - libzstd-dev
+      - libjitterentropy3-dev
       stage-packages:
       - libasound2-dev
       - libssl-dev
       - zlib1g-dev
       - libzstd-dev
+      - libjitterentropy3-dev
 
   apps:
     v4l2rtspserver:
