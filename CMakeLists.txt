@@ -92,11 +92,13 @@ if (OpenSSL_FOUND)
     # libcrypto needs zlib when statically linked
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(ZLIB QUIET zlib)
+    MESSAGE("ZLIB_FOUND = ${ZLIB_FOUND} ZLIB_LIBRARIES=${ZLIB_LIBRARIES}")
     if (ZLIB_FOUND)
         set(LIBRARIES ${LIBRARIES} ${ZLIB_LIBRARIES})
         link_directories(${ZLIB_LIBRARY_DIRS})
     endif()
 endif ()
+MESSAGE("LIBRARIES = ${LIBRARIES}")
 
 #pthread
 find_package (Threads)
