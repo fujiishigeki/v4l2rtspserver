@@ -46,7 +46,7 @@ public:
 
    void afterGettingFrame(unsigned frameSize, unsigned numTruncatedBytes, struct timeval presentationTime, unsigned durationInMicroseconds);
    virtual u_int8_t type() { return m_restartInterval ? m_type | 0x40 : m_type; };
-   virtual u_int8_t qFactor() { return 128; };
+   virtual u_int8_t qFactor() { return 255; };
    virtual u_int8_t width() { return m_width; };
    virtual u_int8_t height() { return m_height; };
    virtual u_int16_t restartInterval() { return m_restartInterval; }
@@ -70,7 +70,7 @@ protected:
    FramedSource *m_inputSource;
    u_int8_t m_width;
    u_int8_t m_height;
-   u_int8_t m_qTable[128 * 2];
+   u_int8_t m_qTable[128];
    unsigned int m_qTableSize;
    unsigned int m_precision;
    u_int8_t m_type;
