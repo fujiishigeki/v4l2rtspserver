@@ -1,7 +1,7 @@
 
   name: v4l2-rtspserver
   base: core26
-  version: git
+  adopt-info: v4l2rtspserver
   summary: RTSP Server for V4L2 device capture supporting HEVC/H264/JPEG/VP8/VP9
   description: |
     This is a lightweight streamer feed from :
@@ -41,6 +41,9 @@
       - zlib1g-dev
       - libzstd-dev
       - libjitterentropy3-dev
+      override-pull: |
+        craftctl default
+        craftctl set version="$(git describe --tags --always)"
 
   apps:
     v4l2rtspserver:
