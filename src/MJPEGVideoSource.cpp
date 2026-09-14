@@ -60,14 +60,15 @@ void MJPEGVideoSource::afterGettingFrame(unsigned frameSize, unsigned numTruncat
 			while (qtable_length > 0)
 			{
 				LOG(DEBUG) << "DQT qtable_length:" << qtable_length;
-				unsigned int precision = (fTo[qtable_position] & 0xf0) << 4;
+				unsigned int precision = (fTo[qtable_position] & 0xf0) >> 4;
 				unsigned int quantIdx = fTo[qtable_position] & 0x0f;
 				unsigned int quantSize = 64 * (precision + 1);
-				if (quantSize * quantIdx + quantSize <= sizeof(m_qTable))
+				if ((quantIdx < 2) && (quantSize * quantIdx + quantSize <= sizeof(m_qTable)))
 				{
 					if ((qtable_position + quantSize) < frameSize)
 					{
 						memcpy(m_qTable + quantSize * quantIdx, fTo + qtable_position + 1, quantSize);
+						m_precision = precision;
 						LOG(DEBUG) << "Quantization table idx:" << quantIdx << " precision:" << precision << " size:" << quantSize << " total size:" << m_qTableSize;
 						if (quantSize * quantIdx + quantSize > m_qTableSize)
 						{

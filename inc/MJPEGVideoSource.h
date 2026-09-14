@@ -70,7 +70,7 @@ protected:
    FramedSource *m_inputSource;
    u_int8_t m_width;
    u_int8_t m_height;
-   u_int8_t m_qTable[128];
+   u_int8_t m_qTable[128 * 2];
    unsigned int m_qTableSize;
    unsigned int m_precision;
    u_int8_t m_type;
